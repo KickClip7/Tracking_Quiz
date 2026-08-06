@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 const ASPECT_W = 16;
 const ASPECT_H = 9;
@@ -21,7 +28,16 @@ const ASPECT_H = 9;
  * px 값을 계산하는 편이 훨씬 안정적이다.)
  */
 const VideoStage = forwardRef(function VideoStage(
-  { src, loop = false, muted = false, simulateMs = 8000, onEnded, onProgress, placeholderHint },
+  {
+    src,
+    loop = false,
+    muted = false,
+    simulateMs = 8000,
+    onEnded,
+    onProgress,
+    onDuration,
+    placeholderHint,
+  },
   ref,
 ) {
   // "checking" | "ready" | "broken"
@@ -29,6 +45,29 @@ const VideoStage = forwardRef(function VideoStage(
   const [size, setSize] = useState(null);
   const rafRef = useRef(null);
   const containerRef = useRef(null);
+  const videoElRef = useRef(null);
+  // 시뮬레이션(폴백) 진행률 타이머의 시작 시각. restart()가 외부에서
+  // 이 값을 리셋할 수 있도록 effect 지역 변수 대신 ref로 들고 있는다.
+  const simStartRef = useRef(0);
+
+  // 부모(App.jsx)가 실제 <video> DOM을 직접 다루지 않고도 재생을 제어할 수
+  // 있도록 pause/restart만 노출한다. restart는 실제 영상뿐 아니라 파일이
+  // 없어 시뮬레이션 중인 경우에도 동일하게 동작해야 하므로 두 경로를 분기한다.
+  useImperativeHandle(
+    ref,
+    () => ({
+      pause: () => videoElRef.current?.pause?.(),
+      restart: () => {
+        const video = videoElRef.current;
+        if (video) {
+          video.currentTime = 0;
+          video.play?.()?.catch?.(() => {});
+        }
+        simStartRef.current = performance.now();
+      },
+    }),
+    [],
+  );
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -58,8 +97,10 @@ const VideoStage = forwardRef(function VideoStage(
   // 바뀔 때만 재시작하도록 분리한다.
   const onProgressRef = useRef(onProgress);
   const onEndedRef = useRef(onEnded);
+  const onDurationRef = useRef(onDuration);
   onProgressRef.current = onProgress;
   onEndedRef.current = onEnded;
+  onDurationRef.current = onDuration;
 
   useEffect(() => {
     if (!src) {
@@ -86,14 +127,15 @@ const VideoStage = forwardRef(function VideoStage(
 
   useEffect(() => {
     if (status !== "broken") return undefined;
-    let start = performance.now();
+    onDurationRef.current?.(simulateMs / 1000);
+    simStartRef.current = performance.now();
 
     const tick = (now) => {
-      const ratio = Math.min(1, (now - start) / simulateMs);
+      const ratio = Math.min(1, (now - simStartRef.current) / simulateMs);
       onProgressRef.current?.(ratio);
       if (ratio >= 1) {
         if (loop) {
-          start = now;
+          simStartRef.current = now;
           rafRef.current = requestAnimationFrame(tick);
         } else {
           onEndedRef.current?.();
@@ -113,6 +155,11 @@ const VideoStage = forwardRef(function VideoStage(
     onProgress?.(video.currentTime / video.duration);
   };
 
+  const handleLoadedMetadata = (event) => {
+    const { duration } = event.target;
+    if (Number.isFinite(duration)) onDuration?.(duration);
+  };
+
   const stageStyle = size ? { width: size.width, height: size.height } : { opacity: 0 };
 
   return (
@@ -125,7 +172,7 @@ const VideoStage = forwardRef(function VideoStage(
       ) : (
         <div className="video-stage" style={stageStyle}>
           <video
-            ref={ref}
+            ref={videoElRef}
             key={src}
             src={src}
             autoPlay
@@ -134,6 +181,7 @@ const VideoStage = forwardRef(function VideoStage(
             playsInline
             onEnded={onEnded}
             onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
             onError={() => setStatus("broken")}
           />
         </div>
