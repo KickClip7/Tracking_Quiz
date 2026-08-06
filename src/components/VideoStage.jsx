@@ -49,14 +49,33 @@ const VideoStage = forwardRef(function VideoStage(
   // 시뮬레이션(폴백) 진행률 타이머의 시작 시각. restart()가 외부에서
   // 이 값을 리셋할 수 있도록 effect 지역 변수 대신 ref로 들고 있는다.
   const simStartRef = useRef(0);
+  // 일시정지 중에는 시뮬레이션 진행률이 멈춰야 하므로, 멈춘 시각과 그동안
+  // 누적된 정지 시간을 따로 들고 있다가 경과 시간 계산에서 빼준다.
+  const simPausedRef = useRef(false);
+  const simPausedAtRef = useRef(0);
+  const simPauseOffsetRef = useRef(0);
 
   // 부모(App.jsx)가 실제 <video> DOM을 직접 다루지 않고도 재생을 제어할 수
-  // 있도록 pause/restart만 노출한다. restart는 실제 영상뿐 아니라 파일이
-  // 없어 시뮬레이션 중인 경우에도 동일하게 동작해야 하므로 두 경로를 분기한다.
+  // 있도록 pause/play/restart를 노출한다. 실제 영상 파일이 없어 시뮬레이션
+  // 중인 경우(파일 미존재 폴백)에도 동일하게 일시정지/재생/재시작이 되어야
+  // 하므로 두 경로를 분기해서 처리한다.
   useImperativeHandle(
     ref,
     () => ({
-      pause: () => videoElRef.current?.pause?.(),
+      pause: () => {
+        videoElRef.current?.pause?.();
+        if (!simPausedRef.current) {
+          simPausedRef.current = true;
+          simPausedAtRef.current = performance.now();
+        }
+      },
+      play: () => {
+        videoElRef.current?.play?.()?.catch?.(() => {});
+        if (simPausedRef.current) {
+          simPauseOffsetRef.current += performance.now() - simPausedAtRef.current;
+          simPausedRef.current = false;
+        }
+      },
       restart: () => {
         const video = videoElRef.current;
         if (video) {
@@ -64,6 +83,8 @@ const VideoStage = forwardRef(function VideoStage(
           video.play?.()?.catch?.(() => {});
         }
         simStartRef.current = performance.now();
+        simPauseOffsetRef.current = 0;
+        simPausedRef.current = false;
       },
     }),
     [],
@@ -129,9 +150,18 @@ const VideoStage = forwardRef(function VideoStage(
     if (status !== "broken") return undefined;
     onDurationRef.current?.(simulateMs / 1000);
     simStartRef.current = performance.now();
+    simPauseOffsetRef.current = 0;
+    simPausedRef.current = false;
 
     const tick = (now) => {
-      const ratio = Math.min(1, (now - simStartRef.current) / simulateMs);
+      if (simPausedRef.current) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const ratio = Math.min(
+        1,
+        (now - simStartRef.current - simPauseOffsetRef.current) / simulateMs,
+      );
       onProgressRef.current?.(ratio);
       if (ratio >= 1) {
         if (loop) {

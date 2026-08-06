@@ -23,6 +23,10 @@ const SWAP_INTERVAL_END_MS = 220;
 const SWAP_HOLD_MS = 1000;
 const SWAP_RAMP_MS = 3000;
 
+// 결과 영상이 끝난 직후 바로 결과 모달을 띄우지 않고, "과연 결과는?" 화면을
+// 잠깐 보여준 다음 결과를 공개한다.
+const RESULT_PENDING_MS = 2000;
+
 // 로딩 화면에 타이핑 애니메이션으로 보여줄 설명 문구
 const LOADING_LINES = [
   "선수 · 축구공 · 골키퍼 · 심판 · 스태프를 탐지하고 있어요 🔍",
@@ -84,6 +88,8 @@ export default function App() {
   const [userPick, setUserPick] = useState(null);
   const [leadTeam, setLeadTeam] = useState("A");
   const [finalRevealed, setFinalRevealed] = useState(false);
+  const [resultPending, setResultPending] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(true);
   const [replayToken, setReplayToken] = useState(0);
   const [introPreviewIndex, setIntroPreviewIndex] = useState(0);
   const [line1Chars, setLine1Chars] = useState(0);
@@ -191,6 +197,7 @@ export default function App() {
         setVideoDuration(null);
         setVideoRemaining(null);
         setVideoElapsedRatio(0);
+        setVideoPlaying(true);
         setStage("WATCHING");
         return;
       }
@@ -205,9 +212,23 @@ export default function App() {
     };
   }, [stage]);
 
+  // 좌우 교대 타이머는 결과가 공개되는 순간(finalRevealed)뿐 아니라, 영상이
+  // 끝나 "과연 결과는?" 화면으로 넘어간 시점(resultPending)에도 멈춰야 한다
+  // — 그 시점부턴 버튼 자체가 화면에서 사라지기 때문.
   useEffect(() => {
-    finalRevealedRef.current = finalRevealed;
-  }, [finalRevealed]);
+    finalRevealedRef.current = finalRevealed || resultPending;
+  }, [finalRevealed, resultPending]);
+
+  // 결과 영상이 끝난 뒤 "과연 결과는?" 화면을 잠깐 보여주고 나서 실제
+  // 결과 모달을 띄운다.
+  useEffect(() => {
+    if (!resultPending) return undefined;
+    const timer = setTimeout(() => {
+      setResultPending(false);
+      setFinalRevealed(true);
+    }, RESULT_PENDING_MS);
+    return () => clearTimeout(timer);
+  }, [resultPending]);
 
   // REVEALING 진입(및 "결과 영상 다시보기")마다 재시작되는 좌우 교대 타이머.
   // 어느 팀이 이길지와 무관하게, 실제 경과 시간을 기준으로 A/B를 번갈아
@@ -219,9 +240,11 @@ export default function App() {
 
     setLeadTeam("A");
     setFinalRevealed(false);
+    setResultPending(false);
     setVideoDuration(null);
     setVideoRemaining(null);
     setVideoElapsedRatio(0);
+    setVideoPlaying(true);
 
     const start = performance.now();
     let current = "A";
@@ -312,7 +335,7 @@ export default function App() {
   const handleRevealEnded = () => {
     if (!selectedClip) return;
     setLeadTeam(selectedClip.scoreA >= selectedClip.scoreB ? "A" : "B");
-    setFinalRevealed(true);
+    setResultPending(true);
   };
 
   const handleSkipReveal = () => {
@@ -320,8 +343,20 @@ export default function App() {
     handleRevealEnded();
   };
 
+  const handleToggleVideoPlay = () => {
+    const ref = stage === "REVEALING" ? revealVideoRef : videoRef;
+    if (videoPlaying) {
+      ref.current?.pause?.();
+      setVideoPlaying(false);
+    } else {
+      ref.current?.play?.();
+      setVideoPlaying(true);
+    }
+  };
+
   const handleReplay = () => {
     setFinalRevealed(false);
+    setResultPending(false);
     setReplayToken((n) => n + 1);
   };
 
@@ -334,6 +369,7 @@ export default function App() {
     setUserPick(null);
     setLeadTeam("A");
     setFinalRevealed(false);
+    setResultPending(false);
     setReplayToken(0);
   };
 
@@ -421,7 +457,9 @@ export default function App() {
           </section>
         )}
 
-        {(stage === "WATCHING" || stage === "SELECTING" || stage === "REVEALING") &&
+        {(stage === "WATCHING" ||
+          stage === "SELECTING" ||
+          (stage === "REVEALING" && !resultPending)) &&
           selectedClip && (
             <div className="quiz-stage-wrap">
               <p className="quiz-instruction">
@@ -454,6 +492,15 @@ export default function App() {
                   {stage === "WATCHING" && (
                     <CountdownBadge remaining={videoRemaining} elapsedRatio={videoElapsedRatio} />
                   )}
+
+                  <button
+                    type="button"
+                    className="video-play-toggle"
+                    onClick={handleToggleVideoPlay}
+                    aria-label={videoPlaying ? "일시정지" : "재생"}
+                  >
+                    {videoPlaying ? "⏸" : "▶"}
+                  </button>
 
                   {stage === "REVEALING" ? (
                     <VideoStage
@@ -530,6 +577,19 @@ export default function App() {
               )}
             </div>
           )}
+
+        {stage === "REVEALING" && resultPending && (
+          <section className="glass-panel loading-stage">
+            <div className="loading-text">
+              <p className="loading-line">과연 결과는? 🤔</p>
+            </div>
+            <div className="loading-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </section>
+        )}
 
         {stage === "LOADING" && (
           <section className="glass-panel loading-stage">

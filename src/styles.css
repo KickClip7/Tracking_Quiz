@@ -718,6 +718,32 @@ body {
   font-weight: 900;
 }
 
+/* 원본/결과 영상 위, 사용자가 직접 멈추고 다시 재생할 수 있는 버튼 */
+.video-play-toggle {
+  position: absolute;
+  z-index: 2;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.video-play-toggle:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px) scale(1.05);
+}
+
 .side-pick {
   /* 클립마다 다른 팀 색(clips.js의 teamA/teamB.color)을 인라인 style로
      주입받는 변수. 지정 안 하면 기본 파랑으로 보이게 폴백을 둔다. */
@@ -765,8 +791,14 @@ body {
    (leadTeam이 바뀌는 간격 자체가 초반엔 느긋하게, 후반엔 빠르게 좁아지므로
    좌우가 번갈아 나타났다 사라지는 속도가 점점 빨라지는 것으로 긴장감을 준다.)
    opacity/transform은 animation이 아니라 transition이라, leadTeam이 아무리
-   빨리 바뀌어도 매번 새로 리셋되지 않고 항상 매끄럽게 다음 상태로 이어진다. */
+   빨리 바뀌어도 매번 새로 리셋되지 않고 항상 매끄럽게 다음 상태로 이어진다.
+   SELECTING 단계에서 걸렸던 .show의 fadeSlideUp 진입 애니메이션이
+   fill-mode:forwards로 opacity/transform 값을 계속 "고정"하고 있으면 —
+   CSS에서는 애니메이션이 적용한 값이 일반 선언보다 우선순위가 높기 때문에 —
+   아래 opacity/transform 규칙이 무시되고 버튼이 계속 켜진 채로 보이는
+   문제가 있었다. animation: none으로 그 진입 애니메이션을 확실히 해제한다. */
 .side-pick.reveal {
+  animation: none;
   transition: opacity 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
