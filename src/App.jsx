@@ -4,6 +4,7 @@ import StepIndicator from "./components/StepIndicator.jsx";
 import Wheel from "./components/Wheel.jsx";
 import VideoStage from "./components/VideoStage.jsx";
 import CountdownBadge from "./components/CountdownBadge.jsx";
+import TeamLegend from "./components/TeamLegend.jsx";
 import ResultModal from "./components/ResultModal.jsx";
 import { clips } from "./data/clips.js";
 
@@ -431,6 +432,7 @@ export default function App() {
                       {selectedClip.teamB.label}
                     </span>
                   </p>
+                  <TeamLegend teamA={selectedClip.teamA} teamB={selectedClip.teamB} layout="row" />
                   <button className="button primary large" onClick={handleStart}>
                     시작하기
                   </button>
@@ -486,6 +488,11 @@ export default function App() {
                 </button>
 
                 <div className="glass-panel video-card">
+                  <TeamLegend
+                    teamA={selectedClip.teamA}
+                    teamB={selectedClip.teamB}
+                    layout="corner"
+                  />
                   {stage === "REVEALING" && !finalRevealed && (
                     <CountdownBadge remaining={videoRemaining} elapsedRatio={videoElapsedRatio} />
                   )}

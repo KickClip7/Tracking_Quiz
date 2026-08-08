@@ -419,6 +419,51 @@ body {
   font-weight: 800;
 }
 
+/* 어느 팀이 무슨 색 유니폼인지 보여주는 범례. 매치 카드에선 가로로 나란히,
+   영상 위에선 왼쪽 위 코너에 떠 있는 배지로 재사용된다(TeamLegend.jsx). */
+.team-legend {
+  display: flex;
+  gap: 8px;
+}
+
+.team-legend-row {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.team-legend-corner {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(10, 14, 28, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
 /* 룰렛 휠 */
 .wheel-wrap {
   position: relative;
